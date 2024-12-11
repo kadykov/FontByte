@@ -13,4 +13,4 @@ COPY requirements.txt /data/
 
 RUN pip install -r requirements.txt --no-cache-dir
 
-ENTRYPOINT [ "quarto", "render" ]
+ENTRYPOINT [ "quarto", "render", "." ]
