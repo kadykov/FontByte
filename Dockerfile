@@ -13,4 +13,6 @@ COPY requirements.txt /data/
 
 RUN pip install -r requirements.txt --no-cache-dir
 
+ENV XDG_RUNTIME_DIR=/data/
+
 ENTRYPOINT [ "quarto", "render", "." ]
