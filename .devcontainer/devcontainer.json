@@ -25,7 +25,8 @@
         "eamodio.gitlens",
         "quarto.quarto",
         "ms-python.python",
-        "ms-toolsai.jupyter"
+        "ms-toolsai.jupyter",
+        "charliermarsh.ruff"
       ]
     }
   }

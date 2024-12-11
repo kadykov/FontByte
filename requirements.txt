@@ -2,5 +2,6 @@ ipykernel
 pyyaml
 nbformat
 nbclient
+requests
 pandas
 itables
