@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: ghcr.io/kadykov/FontByte:latest
+  IMAGE: ghcr.io/kadykov/fontbyte:latest
   OUTPUT_DIR: _site
   OUTPUT_ARTIFACTS_NAME: website
 
