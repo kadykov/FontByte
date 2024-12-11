@@ -1,0 +1,6 @@
+ipykernel
+pyyaml
+nbformat
+nbclient
+pandas
+itables
