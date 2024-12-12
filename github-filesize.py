@@ -1,6 +1,7 @@
 # %%
 from dataclasses import dataclass
 from typing import Any
+from functools import lru_cache
 
 import requests  # type: ignore
 
@@ -49,8 +50,40 @@ class Repository:
                 )
         raise Exception("Not a directory")
 
+    def __hash__(self) -> int:
+        return hash(f"{self.repo_owner}{self.repo_name}{self.branch}")
+
+
+@dataclass
+class Font:
+    repo: Repository
+    path: str
+
+    @lru_cache
+    def get_metadata(self) -> dict[str, Any]:
+        return self.repo.get_file(path=f"{self.path}/metadata.json")
+
+    def _generate_filename(self) -> str:
+        metadata = self.get_metadata()
+        id = metadata["id"]
+        subset = metadata["defSubset"]
+        # variables = metadata["variable"].keys()
+        return f"{id}-{subset}-wght-normal.woff2"
+
+    def get_filesize(self) -> int:
+        sizes = self.repo.get_filesizes(path=f"{self.path}/files/")
+        return sizes[self._generate_filename()]
+
+    def __hash__(self):
+        return hash(f"{self.repo.__hash__()}{self.path}")
+
 
 repo = Repository("fontsource", "font-files")
 font_names = repo.get_foldernames("fonts/variable/")
-repo.get_filesizes(f"fonts/variable/{font_names[0]}/files")
-repo.get_file(f"fonts/variable/{font_names[0]}/metadata.json")
+font = Font(repo=repo, path=f"fonts/variable/{font_names[0]}")
+font.get_metadata()
+font.get_filesize()
+# repo.get_filesizes(f"fonts/variable/{font_names[0]}/files")
+# repo.get_file(f"fonts/variable/{font_names[0]}/metadata.json")
+
+# %%
