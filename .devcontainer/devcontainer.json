@@ -20,13 +20,12 @@
     "vscode": {
       "extensions": [
         "ms-azuretools.vscode-docker",
-        "skellock.just",
         "GitHub.vscode-github-actions",
         "eamodio.gitlens",
-        "quarto.quarto",
         "ms-python.python",
         "ms-toolsai.jupyter",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "ms-python.isort"
       ]
     }
   }
