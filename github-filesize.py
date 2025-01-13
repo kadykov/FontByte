@@ -1,139 +1,252 @@
 # %%
 import json
 import os
+import asyncio
+import base64
+import time
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Any
 
+import aiohttp
 import pandas as pd
-from github import Auth, Github, Repository
+from gidgethub import RateLimitExceeded
+from gidgethub.aiohttp import GitHubAPI
 from IPython.display import HTML
 from itables import to_html_datatable
+
+# GitHub API limits
+MAX_CONCURRENT_REQUESTS = 50  # Keep well below the 100 limit
+REQUESTS_PER_MINUTE = 800  # Keep below 900 to have some buffer
+
+# Create a semaphore to limit concurrent requests
+request_semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
+# Track request times for rate limiting
+request_times: list[float] = []
+
+
+async def rate_limit_wait():
+    """Wait if we're exceeding the rate limit."""
+    now = time.time()
+    # Remove requests older than 1 minute
+    while request_times and request_times[0] < now - 60:
+        request_times.pop(0)
+    # If we're at the limit, wait until we have capacity
+    if len(request_times) >= REQUESTS_PER_MINUTE:
+        wait_time = request_times[0] - (now - 60)
+        if wait_time > 0:
+            print(f"Rate limit reached, waiting {wait_time:.1f} seconds...")
+            await asyncio.sleep(wait_time)
+    request_times.append(now)
+
+
+async def github_request(gh: GitHubAPI, url: str) -> Any:
+    """Make a GitHub API request with rate limiting and retries."""
+    async with request_semaphore:
+        while True:
+            try:
+                await rate_limit_wait()
+                return await gh.getitem(url)
+            except RateLimitExceeded as e:
+                # Wait until rate limit resets
+                print(f"Rate limit exceeded, waiting {e.reset_in} seconds...")
+                await asyncio.sleep(e.reset_in)
+                continue
 
 
 @dataclass
 class Font:
-    repo: Repository
+    gh: GitHubAPI
+    owner: str
+    repo: str
     path: str
+    _metadata_cache: dict[str, Any] | None = None
+    _filesizes_cache: dict[str, int] | None = None
 
-    @lru_cache
-    def get_metadata(self) -> dict[str, Any]:
-        contents = self.repo.get_contents(f"{self.path}/metadata.json")
-        return json.loads(contents.decoded_content)
+    async def get_metadata(self) -> dict[str, Any]:
+        if self._metadata_cache is None:
+            response = await github_request(
+                self.gh,
+                f"/repos/{self.owner}/{self.repo}/contents/{self.path}/metadata.json",
+            )
+            content = base64.b64decode(response["content"]).decode("utf-8")
+            self._metadata_cache = json.loads(content)
+        return self._metadata_cache
 
-    def _generate_filename(self, subset=None, variable="wght", style="normal") -> str:
-        metadata = self.get_metadata()
+    async def _generate_filename(
+        self, subset=None, variable="wght", style="normal"
+    ) -> str:
+        metadata = await self.get_metadata()
         id = metadata["id"]
         if not subset:
             subset = metadata["defSubset"]
         return f"{id}-{subset}-{variable}-{style}.woff2"
 
-    def get_filesize(self, subset=None, variable="wght", style="normal") -> int | None:
-        filename = self._generate_filename(
+    async def get_filesize(
+        self, subset=None, variable="wght", style="normal"
+    ) -> int | None:
+        filename = await self._generate_filename(
             subset=subset, variable=variable, style=style
         )
-        return self._get_filesizes().get(filename)
+        filesizes = await self._get_filesizes()
+        return filesizes.get(filename)
 
-    @lru_cache
-    def _get_filesizes(self) -> dict[str, int]:
-        contents = self.repo.get_contents(path=f"{self.path}/files")
-        return {content.name: content.size for content in contents}
+    async def _get_filesizes(self) -> dict[str, int]:
+        if self._filesizes_cache is None:
+            response = await github_request(
+                self.gh, f"/repos/{self.owner}/{self.repo}/contents/{self.path}/files"
+            )
+            self._filesizes_cache = {item["name"]: item["size"] for item in response}
+        return self._filesizes_cache
 
-    def get_family(self) -> str:
-        return self.get_metadata()["family"]
+    async def get_family(self) -> str:
+        metadata = await self.get_metadata()
+        return metadata["family"]
 
-    def get_variables(self) -> dict[str, dict]:
-        return self.get_metadata()["variable"]
+    async def get_variables(self) -> dict[str, dict]:
+        metadata = await self.get_metadata()
+        return metadata["variable"]
 
-    def get_category(self) -> str:
-        category = self.get_metadata()["category"]
+    async def get_category(self) -> str:
+        metadata = await self.get_metadata()
+        category = metadata["category"]
         if category.startswith("sans-"):
             return "sans"
         return category
 
-    def get_subsets(self) -> list[str]:
-        return self.get_metadata()["subsets"]
+    async def get_subsets(self) -> list[str]:
+        metadata = await self.get_metadata()
+        return metadata["subsets"]
 
-    def get_styles(self) -> list[str]:
-        return self.get_metadata()["styles"]
+    async def get_styles(self) -> list[str]:
+        metadata = await self.get_metadata()
+        return metadata["styles"]
 
-    def get_url(self) -> str:
-        id = self.get_metadata()["id"]
+    async def get_url(self) -> str:
+        metadata = await self.get_metadata()
+        id = metadata["id"]
         return f"https://fontsource.org/fonts/{id}"
 
     def __hash__(self):
-        return hash(f"{self.repo.__hash__()}{self.path}")
+        return hash(f"{self.owner}/{self.repo}/{self.path}")
 
 
-os.environ["GITHUB_TOKEN"]
-
-auth = Auth.Token(os.environ["GITHUB_TOKEN"])
-g = Github(auth=auth)
-
-repo = g.get_repo("fontsource/font-files")
-contents = repo.get_contents("fonts/variable")
-
-font_names = [content.name for content in contents][
-    :50
-]  # Limit to 50 fonts for development
+async def get_font_names() -> list[str]:
+    async with aiohttp.ClientSession() as session:
+        gh = GitHubAPI(
+            session,
+            "openhands",
+            oauth_token=os.environ["GITHUB_TOKEN"],
+        )
+        response = await github_request(
+            gh, "/repos/fontsource/font-files/contents/fonts/variable"
+        )
+        return [item["name"] for item in response]  # No longer limiting to 50 fonts
 
 
 # %%
-def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
-    sizes = {}
-    categories = {}
-    subsets = {}
-    styles = {}
-    variables = {}
+async def process_font(
+    gh: GitHubAPI, font_name: str, axis: str
+) -> tuple[str, dict] | None:
+    font = Font(
+        gh=gh, owner="fontsource", repo="font-files", path=f"fonts/variable/{font_name}"
+    )
+    subsets = await font.get_subsets()
+    variables = await font.get_variables()
+    filesize = await font.get_filesize(variable=axis)
 
-    for font_name in font_names:
-        font = Font(repo=repo, path=f"fonts/variable/{font_name}")
-        print(font.get_family())
-        if ("latin" in font.get_subsets()) and (
-            axis in font.get_variables() and font.get_filesize(variable=axis)
-        ):
-            family = font.get_family()
-            linked_family = f'<a href="{font.get_url()}">{family}</a>'
-            sizes[linked_family] = font.get_filesize(variable=axis)
-            categories[linked_family] = font.get_category()
-            subsets[linked_family] = font.get_subsets()
-            styles[linked_family] = font.get_styles()
-            variables[linked_family] = font.get_variables().keys()
+    if ("latin" in subsets) and (axis in variables and filesize):
+        family = await font.get_family()
+        url = await font.get_url()
+        linked_family = f'<a href="{url}">{family}</a>'
+        print(family)
 
-    df = pd.DataFrame.from_dict(
-        {
-            f"Latin file size [{axis}] [bytes]": sizes,
-            "Category": categories,
-            "Subsets": subsets,
-            "Style": styles,
-            "Variables": variables,
+        return linked_family, {
+            "size": filesize,
+            "category": await font.get_category(),
+            "subsets": subsets,
+            "styles": await font.get_styles(),
+            "variables": variables.keys(),
         }
-    )
+    return None
 
-    html = to_html_datatable(
-        df.sort_values(f"Latin file size [{axis}] [bytes]"),
-        display_logo_when_loading=False,
-        layout={
-            "topStart": "search",
-            "topEnd": "pageLength",
-            "bottomStart": "paging",
-            "bottomEnd": "info",
-        },
-        column_filters="footer",
-        lengthMenu=[10, 25, 50, 100, 250, 500],
-    )
 
-    with open(output_file, "w") as table:
-        table.write(HTML(html).data)
+async def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
+    async with aiohttp.ClientSession() as session:
+        gh = GitHubAPI(
+            session,
+            "openhands",
+            oauth_token=os.environ["GITHUB_TOKEN"],
+        )
+
+        # Process fonts in parallel with TaskGroup
+        async with asyncio.TaskGroup() as tg:
+            tasks = [
+                tg.create_task(process_font(gh, font_name, axis))
+                for font_name in font_names
+            ]
+        # All tasks are complete when we exit the context manager
+        results = [task.result() for task in tasks]
+
+        sizes = {}
+        categories = {}
+        subsets = {}
+        styles = {}
+        variables = {}
+
+        for result in results:
+            if result:
+                linked_family, data = result
+                sizes[linked_family] = data["size"]
+                categories[linked_family] = data["category"]
+                subsets[linked_family] = data["subsets"]
+                styles[linked_family] = data["styles"]
+                variables[linked_family] = data["variables"]
+
+        df = pd.DataFrame.from_dict(
+            {
+                f"Latin file size [{axis}] [bytes]": sizes,
+                "Category": categories,
+                "Subsets": subsets,
+                "Style": styles,
+                "Variables": variables,
+            }
+        )
+
+        html = to_html_datatable(
+            df.sort_values(f"Latin file size [{axis}] [bytes]"),
+            display_logo_when_loading=False,
+            layout={
+                "topStart": "search",
+                "topEnd": "pageLength",
+                "bottomStart": "paging",
+                "bottomEnd": "info",
+            },
+            column_filters="footer",
+            lengthMenu=[10, 25, 50, 100, 250, 500],
+        )
+
+        with open(output_file, "w") as table:
+            table.write(HTML(html).data)
 
 
 # Create tables for different axes
 axes = ["wght", "opsz", "ital", "wdth"]
 
+
 # Generate tables for each axis
-for axis in axes:
-    print(f"\nGenerating table for {axis} axis...")
-    create_font_table(font_names, axis, f"{axis}.html")
+async def main():
+    # Get font names first
+    font_names = await get_font_names()
+
+    # Process each axis in parallel
+    async with asyncio.TaskGroup() as tg:
+        for axis in axes:
+            tg.create_task(create_font_table(font_names, axis, f"{axis}.html"))
+
+
+# Run the async main function
+asyncio.run(main())
 
 # Create index.html with links to all tables
 index_html = """<!DOCTYPE html>
