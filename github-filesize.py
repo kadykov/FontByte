@@ -3,14 +3,55 @@ import json
 import os
 import asyncio
 import base64
+import time
 from dataclasses import dataclass
 from typing import Any
 
 import aiohttp
 import pandas as pd
+from gidgethub import RateLimitExceeded
 from gidgethub.aiohttp import GitHubAPI
 from IPython.display import HTML
 from itables import to_html_datatable
+
+# GitHub API limits
+MAX_CONCURRENT_REQUESTS = 50  # Keep well below the 100 limit
+REQUESTS_PER_MINUTE = 800  # Keep below 900 to have some buffer
+
+# Create a semaphore to limit concurrent requests
+request_semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
+# Track request times for rate limiting
+request_times: list[float] = []
+
+
+async def rate_limit_wait():
+    """Wait if we're exceeding the rate limit."""
+    now = time.time()
+    # Remove requests older than 1 minute
+    while request_times and request_times[0] < now - 60:
+        request_times.pop(0)
+    # If we're at the limit, wait until we have capacity
+    if len(request_times) >= REQUESTS_PER_MINUTE:
+        wait_time = request_times[0] - (now - 60)
+        if wait_time > 0:
+            print(f"Rate limit reached, waiting {wait_time:.1f} seconds...")
+            await asyncio.sleep(wait_time)
+    request_times.append(now)
+
+
+async def github_request(gh: GitHubAPI, url: str) -> Any:
+    """Make a GitHub API request with rate limiting and retries."""
+    async with request_semaphore:
+        while True:
+            try:
+                await rate_limit_wait()
+                return await gh.getitem(url)
+            except RateLimitExceeded as e:
+                # Wait until rate limit resets
+                print(f"Rate limit exceeded, waiting {e.reset_in} seconds...")
+                await asyncio.sleep(e.reset_in)
+                continue
 
 
 @dataclass
@@ -24,8 +65,9 @@ class Font:
 
     async def get_metadata(self) -> dict[str, Any]:
         if self._metadata_cache is None:
-            response = await self.gh.getitem(
-                f"/repos/{self.owner}/{self.repo}/contents/{self.path}/metadata.json"
+            response = await github_request(
+                self.gh,
+                f"/repos/{self.owner}/{self.repo}/contents/{self.path}/metadata.json",
             )
             content = base64.b64decode(response["content"]).decode("utf-8")
             self._metadata_cache = json.loads(content)
@@ -51,8 +93,8 @@ class Font:
 
     async def _get_filesizes(self) -> dict[str, int]:
         if self._filesizes_cache is None:
-            response = await self.gh.getitem(
-                f"/repos/{self.owner}/{self.repo}/contents/{self.path}/files"
+            response = await github_request(
+                self.gh, f"/repos/{self.owner}/{self.repo}/contents/{self.path}/files"
             )
             self._filesizes_cache = {item["name"]: item["size"] for item in response}
         return self._filesizes_cache
@@ -96,12 +138,10 @@ async def get_font_names() -> list[str]:
             "openhands",
             oauth_token=os.environ["GITHUB_TOKEN"],
         )
-        response = await gh.getitem(
-            "/repos/fontsource/font-files/contents/fonts/variable"
+        response = await github_request(
+            gh, "/repos/fontsource/font-files/contents/fonts/variable"
         )
-        return [item["name"] for item in response][
-            :50
-        ]  # Limit to 50 fonts for development
+        return [item["name"] for item in response]  # No longer limiting to 50 fonts
 
 
 # %%
