@@ -128,15 +128,82 @@ def create_font_table(font_names: list[str], axis: str, output_file: str) -> Non
 
 
 # Create tables for different axes
-axes = {
-    "wght": "index.html",  # weight axis (default table)
-    "opsz": "opsz.html",  # optical size axis
-    "ital": "ital.html",  # italic axis
-    "wdth": "wdth.html",  # width axis
+axes = ["wght", "opsz", "ital", "wdth"]
+
+# Generate tables for each axis
+for axis in axes:
+    print(f"\nGenerating table for {axis} axis...")
+    create_font_table(font_names, axis, f"{axis}.html")
+
+# Create index.html with links to all tables
+index_html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Variable Font Size Tables</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        h1 { margin-bottom: 2rem; }
+        .axis-list {
+            list-style: none;
+            padding: 0;
+        }
+        .axis-list li {
+            margin: 1rem 0;
+        }
+        .axis-list a {
+            display: block;
+            padding: 1rem;
+            background: #f0f0f0;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        .axis-list a:hover {
+            background: #e0e0e0;
+        }
+        .axis-name {
+            font-weight: bold;
+        }
+        .axis-desc {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 0.3rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Variable Font Size Tables</h1>
+    <ul class="axis-list">"""
+
+# Add a link and description for each axis
+axis_descriptions = {
+    "wght": "Weight axis - controls the thickness of the font strokes",
+    "opsz": "Optical Size axis - optimizes the design for different sizes",
+    "ital": "Italic axis - controls the slant and cursive forms",
+    "wdth": "Width axis - adjusts the horizontal proportions",
 }
 
-for axis, output_file in axes.items():
-    print(f"\nGenerating table for {axis} axis...")
-    create_font_table(font_names, axis, output_file)
+for axis in axes:
+    index_html += f"""
+        <li>
+            <a href="{axis}.html">
+                <div class="axis-name">{axis.upper()} Axis</div>
+                <div class="axis-desc">{axis_descriptions[axis]}</div>
+            </a>
+        </li>"""
+
+index_html += """
+    </ul>
+</body>
+</html>"""
+
+with open("index.html", "w") as f:
+    f.write(index_html)
 
 # %%
