@@ -73,7 +73,11 @@ g = Github(auth=auth)
 repo = g.get_repo("fontsource/font-files")
 contents = repo.get_contents("fonts/variable")
 
-font_names = [content.name for content in contents][:50]  # Limit to 50 fonts for development
+font_names = [content.name for content in contents][
+    :50
+]  # Limit to 50 fonts for development
+
+
 # %%
 def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
     sizes = {}
@@ -81,7 +85,7 @@ def create_font_table(font_names: list[str], axis: str, output_file: str) -> Non
     subsets = {}
     styles = {}
     variables = {}
-    
+
     for font_name in font_names:
         font = Font(repo=repo, path=f"fonts/variable/{font_name}")
         print(font.get_family())
@@ -121,6 +125,7 @@ def create_font_table(font_names: list[str], axis: str, output_file: str) -> Non
 
     with open(output_file, "w") as table:
         table.write(HTML(html).data)
+
 
 # Create table for wght axis
 create_font_table(font_names, "wght", "index.html")
