@@ -127,10 +127,16 @@ def create_font_table(font_names: list[str], axis: str, output_file: str) -> Non
         table.write(HTML(html).data)
 
 
-# Create table for wght axis
-create_font_table(font_names, "wght", "index.html")
+# Create tables for different axes
+axes = {
+    "wght": "index.html",  # weight axis (default table)
+    "opsz": "opsz.html",  # optical size axis
+    "ital": "ital.html",  # italic axis
+    "wdth": "wdth.html",  # width axis
+}
 
-# Create table for opsz axis
-create_font_table(font_names, "opsz", "opsz.html")
+for axis, output_file in axes.items():
+    print(f"\nGenerating table for {axis} axis...")
+    create_font_table(font_names, axis, output_file)
 
 # %%
