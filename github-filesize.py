@@ -73,52 +73,64 @@ g = Github(auth=auth)
 repo = g.get_repo("fontsource/font-files")
 contents = repo.get_contents("fonts/variable")
 
-font_names = [content.name for content in contents]
-# %%
-sizes = {}
-categories = {}
-subsets = {}
-styles = {}
-variables = {}
-for font_name in font_names:
-    font = Font(repo=repo, path=f"fonts/variable/{font_name}")
-    print(font.get_family())
-    if ("latin" in font.get_subsets()) and (
-        "wght" in font.get_variables() and font.get_filesize()
-    ):
-        family = font.get_family()
-        linked_family = f'<a href="{font.get_url()}">{family}</a>'
-        sizes[linked_family] = font.get_filesize()
-        categories[linked_family] = font.get_category()
-        subsets[linked_family] = font.get_subsets()
-        styles[linked_family] = font.get_styles()
-        variables[linked_family] = font.get_variables().keys()
+font_names = [content.name for content in contents][
+    :50
+]  # Limit to 50 fonts for development
+
 
 # %%
-df = pd.DataFrame.from_dict(
-    {
-        "Latin file size [bytes]": sizes,
-        "Category": categories,
-        "Subsets": subsets,
-        "Style": styles,
-        "Variables": variables,
-    }
-)
-# %%
-html = to_html_datatable(
-    df.sort_values("Latin file size [bytes]"),
-    display_logo_when_loading=False,
-    layout={
-        "topStart": "search",
-        "topEnd": "pageLength",
-        "bottomStart": "paging",
-        "bottomEnd": "info",
-    },
-    column_filters="footer",
-    lengthMenu=[10, 25, 50, 100, 250, 500],
-)
+def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
+    sizes = {}
+    categories = {}
+    subsets = {}
+    styles = {}
+    variables = {}
 
-with open("index.html", "w") as table:
-    table.write(HTML(html).data)
+    for font_name in font_names:
+        font = Font(repo=repo, path=f"fonts/variable/{font_name}")
+        print(font.get_family())
+        if ("latin" in font.get_subsets()) and (
+            axis in font.get_variables() and font.get_filesize(variable=axis)
+        ):
+            family = font.get_family()
+            linked_family = f'<a href="{font.get_url()}">{family}</a>'
+            sizes[linked_family] = font.get_filesize(variable=axis)
+            categories[linked_family] = font.get_category()
+            subsets[linked_family] = font.get_subsets()
+            styles[linked_family] = font.get_styles()
+            variables[linked_family] = font.get_variables().keys()
+
+    df = pd.DataFrame.from_dict(
+        {
+            f"Latin file size [{axis}] [bytes]": sizes,
+            "Category": categories,
+            "Subsets": subsets,
+            "Style": styles,
+            "Variables": variables,
+        }
+    )
+
+    html = to_html_datatable(
+        df.sort_values(f"Latin file size [{axis}] [bytes]"),
+        display_logo_when_loading=False,
+        layout={
+            "topStart": "search",
+            "topEnd": "pageLength",
+            "bottomStart": "paging",
+            "bottomEnd": "info",
+        },
+        column_filters="footer",
+        lengthMenu=[10, 25, 50, 100, 250, 500],
+    )
+
+    with open(output_file, "w") as table:
+        table.write(HTML(html).data)
+
+
+# Create table for wght axis
+create_font_table(font_names, "wght", "index.html")
+
+# Create table for opsz axis
+create_font_table(font_names, "opsz", "opsz.html")
 
 # %%
