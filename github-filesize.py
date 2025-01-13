@@ -117,8 +117,13 @@ async def process_font(font_name: str, axis: str) -> tuple[str, dict] | None:
 
 
 async def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
-    tasks = [process_font(font_name, axis) for font_name in font_names]
-    results = await asyncio.gather(*tasks)
+    # Process fonts in parallel with TaskGroup
+    async with asyncio.TaskGroup() as tg:
+        tasks = [
+            tg.create_task(process_font(font_name, axis)) for font_name in font_names
+        ]
+    # All tasks are complete when we exit the context manager
+    results = [task.result() for task in tasks]
 
     sizes = {}
     categories = {}
