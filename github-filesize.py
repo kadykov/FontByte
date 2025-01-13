@@ -1,6 +1,7 @@
 # %%
 import json
 import os
+import asyncio
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -15,50 +16,61 @@ from itables import to_html_datatable
 class Font:
     repo: Repository
     path: str
+    _metadata_cache: dict[str, Any] | None = None
+    _filesizes_cache: dict[str, int] | None = None
 
-    @lru_cache
-    def get_metadata(self) -> dict[str, Any]:
-        contents = self.repo.get_contents(f"{self.path}/metadata.json")
-        return json.loads(contents.decoded_content)
+    async def get_metadata(self) -> dict[str, Any]:
+        if self._metadata_cache is None:
+            contents = self.repo.get_contents(f"{self.path}/metadata.json")
+            self._metadata_cache = json.loads(contents.decoded_content)
+        return self._metadata_cache
 
-    def _generate_filename(self, subset=None, variable="wght", style="normal") -> str:
-        metadata = self.get_metadata()
+    async def _generate_filename(self, subset=None, variable="wght", style="normal") -> str:
+        metadata = await self.get_metadata()
         id = metadata["id"]
         if not subset:
             subset = metadata["defSubset"]
         return f"{id}-{subset}-{variable}-{style}.woff2"
 
-    def get_filesize(self, subset=None, variable="wght", style="normal") -> int | None:
-        filename = self._generate_filename(
+    async def get_filesize(self, subset=None, variable="wght", style="normal") -> int | None:
+        filename = await self._generate_filename(
             subset=subset, variable=variable, style=style
         )
-        return self._get_filesizes().get(filename)
+        filesizes = await self._get_filesizes()
+        return filesizes.get(filename)
 
-    @lru_cache
-    def _get_filesizes(self) -> dict[str, int]:
-        contents = self.repo.get_contents(path=f"{self.path}/files")
-        return {content.name: content.size for content in contents}
+    async def _get_filesizes(self) -> dict[str, int]:
+        if self._filesizes_cache is None:
+            contents = self.repo.get_contents(path=f"{self.path}/files")
+            self._filesizes_cache = {content.name: content.size for content in contents}
+        return self._filesizes_cache
 
-    def get_family(self) -> str:
-        return self.get_metadata()["family"]
+    async def get_family(self) -> str:
+        metadata = await self.get_metadata()
+        return metadata["family"]
 
-    def get_variables(self) -> dict[str, dict]:
-        return self.get_metadata()["variable"]
+    async def get_variables(self) -> dict[str, dict]:
+        metadata = await self.get_metadata()
+        return metadata["variable"]
 
-    def get_category(self) -> str:
-        category = self.get_metadata()["category"]
+    async def get_category(self) -> str:
+        metadata = await self.get_metadata()
+        category = metadata["category"]
         if category.startswith("sans-"):
             return "sans"
         return category
 
-    def get_subsets(self) -> list[str]:
-        return self.get_metadata()["subsets"]
+    async def get_subsets(self) -> list[str]:
+        metadata = await self.get_metadata()
+        return metadata["subsets"]
 
-    def get_styles(self) -> list[str]:
-        return self.get_metadata()["styles"]
+    async def get_styles(self) -> list[str]:
+        metadata = await self.get_metadata()
+        return metadata["styles"]
 
-    def get_url(self) -> str:
-        id = self.get_metadata()["id"]
+    async def get_url(self) -> str:
+        metadata = await self.get_metadata()
+        id = metadata["id"]
         return f"https://fontsource.org/fonts/{id}"
 
     def __hash__(self):
@@ -79,26 +91,45 @@ font_names = [content.name for content in contents][
 
 
 # %%
-def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
+async def process_font(font_name: str, axis: str) -> tuple[str, dict] | None:
+    font = Font(repo=repo, path=f"fonts/variable/{font_name}")
+    subsets = await font.get_subsets()
+    variables = await font.get_variables()
+    filesize = await font.get_filesize(variable=axis)
+    
+    if ("latin" in subsets) and (axis in variables and filesize):
+        family = await font.get_family()
+        url = await font.get_url()
+        linked_family = f'<a href="{url}">{family}</a>'
+        print(family)
+        
+        return linked_family, {
+            "size": filesize,
+            "category": await font.get_category(),
+            "subsets": subsets,
+            "styles": await font.get_styles(),
+            "variables": variables.keys(),
+        }
+    return None
+
+async def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
+    tasks = [process_font(font_name, axis) for font_name in font_names]
+    results = await asyncio.gather(*tasks)
+    
     sizes = {}
     categories = {}
     subsets = {}
     styles = {}
     variables = {}
-
-    for font_name in font_names:
-        font = Font(repo=repo, path=f"fonts/variable/{font_name}")
-        print(font.get_family())
-        if ("latin" in font.get_subsets()) and (
-            axis in font.get_variables() and font.get_filesize(variable=axis)
-        ):
-            family = font.get_family()
-            linked_family = f'<a href="{font.get_url()}">{family}</a>'
-            sizes[linked_family] = font.get_filesize(variable=axis)
-            categories[linked_family] = font.get_category()
-            subsets[linked_family] = font.get_subsets()
-            styles[linked_family] = font.get_styles()
-            variables[linked_family] = font.get_variables().keys()
+    
+    for result in results:
+        if result:
+            linked_family, data = result
+            sizes[linked_family] = data["size"]
+            categories[linked_family] = data["category"]
+            subsets[linked_family] = data["subsets"]
+            styles[linked_family] = data["styles"]
+            variables[linked_family] = data["variables"]
 
     df = pd.DataFrame.from_dict(
         {
@@ -131,9 +162,13 @@ def create_font_table(font_names: list[str], axis: str, output_file: str) -> Non
 axes = ["wght", "opsz", "ital", "wdth"]
 
 # Generate tables for each axis
-for axis in axes:
-    print(f"\nGenerating table for {axis} axis...")
-    create_font_table(font_names, axis, f"{axis}.html")
+async def main():
+    for axis in axes:
+        print(f"\nGenerating table for {axis} axis...")
+        await create_font_table(font_names, axis, f"{axis}.html")
+
+# Run the async main function
+asyncio.run(main())
 
 # Create index.html with links to all tables
 index_html = """<!DOCTYPE html>
