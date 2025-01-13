@@ -73,52 +73,137 @@ g = Github(auth=auth)
 repo = g.get_repo("fontsource/font-files")
 contents = repo.get_contents("fonts/variable")
 
-font_names = [content.name for content in contents]
-# %%
-sizes = {}
-categories = {}
-subsets = {}
-styles = {}
-variables = {}
-for font_name in font_names:
-    font = Font(repo=repo, path=f"fonts/variable/{font_name}")
-    print(font.get_family())
-    if ("latin" in font.get_subsets()) and (
-        "wght" in font.get_variables() and font.get_filesize()
-    ):
-        family = font.get_family()
-        linked_family = f'<a href="{font.get_url()}">{family}</a>'
-        sizes[linked_family] = font.get_filesize()
-        categories[linked_family] = font.get_category()
-        subsets[linked_family] = font.get_subsets()
-        styles[linked_family] = font.get_styles()
-        variables[linked_family] = font.get_variables().keys()
+font_names = [content.name for content in contents][
+    :50
+]  # Limit to 50 fonts for development
+
 
 # %%
-df = pd.DataFrame.from_dict(
-    {
-        "Latin file size [bytes]": sizes,
-        "Category": categories,
-        "Subsets": subsets,
-        "Style": styles,
-        "Variables": variables,
-    }
-)
-# %%
-html = to_html_datatable(
-    df.sort_values("Latin file size [bytes]"),
-    display_logo_when_loading=False,
-    layout={
-        "topStart": "search",
-        "topEnd": "pageLength",
-        "bottomStart": "paging",
-        "bottomEnd": "info",
-    },
-    column_filters="footer",
-    lengthMenu=[10, 25, 50, 100, 250, 500],
-)
+def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
+    sizes = {}
+    categories = {}
+    subsets = {}
+    styles = {}
+    variables = {}
 
-with open("index.html", "w") as table:
-    table.write(HTML(html).data)
+    for font_name in font_names:
+        font = Font(repo=repo, path=f"fonts/variable/{font_name}")
+        print(font.get_family())
+        if ("latin" in font.get_subsets()) and (
+            axis in font.get_variables() and font.get_filesize(variable=axis)
+        ):
+            family = font.get_family()
+            linked_family = f'<a href="{font.get_url()}">{family}</a>'
+            sizes[linked_family] = font.get_filesize(variable=axis)
+            categories[linked_family] = font.get_category()
+            subsets[linked_family] = font.get_subsets()
+            styles[linked_family] = font.get_styles()
+            variables[linked_family] = font.get_variables().keys()
+
+    df = pd.DataFrame.from_dict(
+        {
+            f"Latin file size [{axis}] [bytes]": sizes,
+            "Category": categories,
+            "Subsets": subsets,
+            "Style": styles,
+            "Variables": variables,
+        }
+    )
+
+    html = to_html_datatable(
+        df.sort_values(f"Latin file size [{axis}] [bytes]"),
+        display_logo_when_loading=False,
+        layout={
+            "topStart": "search",
+            "topEnd": "pageLength",
+            "bottomStart": "paging",
+            "bottomEnd": "info",
+        },
+        column_filters="footer",
+        lengthMenu=[10, 25, 50, 100, 250, 500],
+    )
+
+    with open(output_file, "w") as table:
+        table.write(HTML(html).data)
+
+
+# Create tables for different axes
+axes = ["wght", "opsz", "ital", "wdth"]
+
+# Generate tables for each axis
+for axis in axes:
+    print(f"\nGenerating table for {axis} axis...")
+    create_font_table(font_names, axis, f"{axis}.html")
+
+# Create index.html with links to all tables
+index_html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Variable Font Size Tables</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        h1 { margin-bottom: 2rem; }
+        .axis-list {
+            list-style: none;
+            padding: 0;
+        }
+        .axis-list li {
+            margin: 1rem 0;
+        }
+        .axis-list a {
+            display: block;
+            padding: 1rem;
+            background: #f0f0f0;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        .axis-list a:hover {
+            background: #e0e0e0;
+        }
+        .axis-name {
+            font-weight: bold;
+        }
+        .axis-desc {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 0.3rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Variable Font Size Tables</h1>
+    <ul class="axis-list">"""
+
+# Add a link and description for each axis
+axis_descriptions = {
+    "wght": "Weight axis - controls the thickness of the font strokes",
+    "opsz": "Optical Size axis - optimizes the design for different sizes",
+    "ital": "Italic axis - controls the slant and cursive forms",
+    "wdth": "Width axis - adjusts the horizontal proportions",
+}
+
+for axis in axes:
+    index_html += f"""
+        <li>
+            <a href="{axis}.html">
+                <div class="axis-name">{axis.upper()} Axis</div>
+                <div class="axis-desc">{axis_descriptions[axis]}</div>
+            </a>
+        </li>"""
+
+index_html += """
+    </ul>
+</body>
+</html>"""
+
+with open("index.html", "w") as f:
+    f.write(index_html)
 
 # %%
