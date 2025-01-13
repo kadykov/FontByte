@@ -2,26 +2,33 @@
 import json
 import os
 import asyncio
+import base64
 from dataclasses import dataclass
 from typing import Any
 
+import aiohttp
 import pandas as pd
-from github import Auth, Github, Repository
+from gidgethub.aiohttp import GitHubAPI
 from IPython.display import HTML
 from itables import to_html_datatable
 
 
 @dataclass
 class Font:
-    repo: Repository
+    gh: GitHubAPI
+    owner: str
+    repo: str
     path: str
     _metadata_cache: dict[str, Any] | None = None
     _filesizes_cache: dict[str, int] | None = None
 
     async def get_metadata(self) -> dict[str, Any]:
         if self._metadata_cache is None:
-            contents = self.repo.get_contents(f"{self.path}/metadata.json")
-            self._metadata_cache = json.loads(contents.decoded_content)
+            response = await self.gh.getitem(
+                f"/repos/{self.owner}/{self.repo}/contents/{self.path}/metadata.json"
+            )
+            content = base64.b64decode(response["content"]).decode("utf-8")
+            self._metadata_cache = json.loads(content)
         return self._metadata_cache
 
     async def _generate_filename(
@@ -44,8 +51,10 @@ class Font:
 
     async def _get_filesizes(self) -> dict[str, int]:
         if self._filesizes_cache is None:
-            contents = self.repo.get_contents(path=f"{self.path}/files")
-            self._filesizes_cache = {content.name: content.size for content in contents}
+            response = await self.gh.getitem(
+                f"/repos/{self.owner}/{self.repo}/contents/{self.path}/files"
+            )
+            self._filesizes_cache = {item["name"]: item["size"] for item in response}
         return self._filesizes_cache
 
     async def get_family(self) -> str:
@@ -77,25 +86,31 @@ class Font:
         return f"https://fontsource.org/fonts/{id}"
 
     def __hash__(self):
-        return hash(f"{self.repo.__hash__()}{self.path}")
+        return hash(f"{self.owner}/{self.repo}/{self.path}")
 
 
-os.environ["GITHUB_TOKEN"]
-
-auth = Auth.Token(os.environ["GITHUB_TOKEN"])
-g = Github(auth=auth)
-
-repo = g.get_repo("fontsource/font-files")
-contents = repo.get_contents("fonts/variable")
-
-font_names = [content.name for content in contents][
-    :50
-]  # Limit to 50 fonts for development
+async def get_font_names() -> list[str]:
+    async with aiohttp.ClientSession() as session:
+        gh = GitHubAPI(
+            session,
+            "openhands",
+            oauth_token=os.environ["GITHUB_TOKEN"],
+        )
+        response = await gh.getitem(
+            "/repos/fontsource/font-files/contents/fonts/variable"
+        )
+        return [item["name"] for item in response][
+            :50
+        ]  # Limit to 50 fonts for development
 
 
 # %%
-async def process_font(font_name: str, axis: str) -> tuple[str, dict] | None:
-    font = Font(repo=repo, path=f"fonts/variable/{font_name}")
+async def process_font(
+    gh: GitHubAPI, font_name: str, axis: str
+) -> tuple[str, dict] | None:
+    font = Font(
+        gh=gh, owner="fontsource", repo="font-files", path=f"fonts/variable/{font_name}"
+    )
     subsets = await font.get_subsets()
     variables = await font.get_variables()
     filesize = await font.get_filesize(variable=axis)
@@ -117,54 +132,62 @@ async def process_font(font_name: str, axis: str) -> tuple[str, dict] | None:
 
 
 async def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
-    # Process fonts in parallel with TaskGroup
-    async with asyncio.TaskGroup() as tg:
-        tasks = [
-            tg.create_task(process_font(font_name, axis)) for font_name in font_names
-        ]
-    # All tasks are complete when we exit the context manager
-    results = [task.result() for task in tasks]
+    async with aiohttp.ClientSession() as session:
+        gh = GitHubAPI(
+            session,
+            "openhands",
+            oauth_token=os.environ["GITHUB_TOKEN"],
+        )
 
-    sizes = {}
-    categories = {}
-    subsets = {}
-    styles = {}
-    variables = {}
+        # Process fonts in parallel with TaskGroup
+        async with asyncio.TaskGroup() as tg:
+            tasks = [
+                tg.create_task(process_font(gh, font_name, axis))
+                for font_name in font_names
+            ]
+        # All tasks are complete when we exit the context manager
+        results = [task.result() for task in tasks]
 
-    for result in results:
-        if result:
-            linked_family, data = result
-            sizes[linked_family] = data["size"]
-            categories[linked_family] = data["category"]
-            subsets[linked_family] = data["subsets"]
-            styles[linked_family] = data["styles"]
-            variables[linked_family] = data["variables"]
+        sizes = {}
+        categories = {}
+        subsets = {}
+        styles = {}
+        variables = {}
 
-    df = pd.DataFrame.from_dict(
-        {
-            f"Latin file size [{axis}] [bytes]": sizes,
-            "Category": categories,
-            "Subsets": subsets,
-            "Style": styles,
-            "Variables": variables,
-        }
-    )
+        for result in results:
+            if result:
+                linked_family, data = result
+                sizes[linked_family] = data["size"]
+                categories[linked_family] = data["category"]
+                subsets[linked_family] = data["subsets"]
+                styles[linked_family] = data["styles"]
+                variables[linked_family] = data["variables"]
 
-    html = to_html_datatable(
-        df.sort_values(f"Latin file size [{axis}] [bytes]"),
-        display_logo_when_loading=False,
-        layout={
-            "topStart": "search",
-            "topEnd": "pageLength",
-            "bottomStart": "paging",
-            "bottomEnd": "info",
-        },
-        column_filters="footer",
-        lengthMenu=[10, 25, 50, 100, 250, 500],
-    )
+        df = pd.DataFrame.from_dict(
+            {
+                f"Latin file size [{axis}] [bytes]": sizes,
+                "Category": categories,
+                "Subsets": subsets,
+                "Style": styles,
+                "Variables": variables,
+            }
+        )
 
-    with open(output_file, "w") as table:
-        table.write(HTML(html).data)
+        html = to_html_datatable(
+            df.sort_values(f"Latin file size [{axis}] [bytes]"),
+            display_logo_when_loading=False,
+            layout={
+                "topStart": "search",
+                "topEnd": "pageLength",
+                "bottomStart": "paging",
+                "bottomEnd": "info",
+            },
+            column_filters="footer",
+            lengthMenu=[10, 25, 50, 100, 250, 500],
+        )
+
+        with open(output_file, "w") as table:
+            table.write(HTML(html).data)
 
 
 # Create tables for different axes
@@ -173,9 +196,13 @@ axes = ["wght", "opsz", "ital", "wdth"]
 
 # Generate tables for each axis
 async def main():
-    for axis in axes:
-        print(f"\nGenerating table for {axis} axis...")
-        await create_font_table(font_names, axis, f"{axis}.html")
+    # Get font names first
+    font_names = await get_font_names()
+
+    # Process each axis in parallel
+    async with asyncio.TaskGroup() as tg:
+        for axis in axes:
+            tg.create_task(create_font_table(font_names, axis, f"{axis}.html"))
 
 
 # Run the async main function
