@@ -1,0 +1,58 @@
+<table id="itables_2ee72155_2e90_44d4_b3f5_7d02a98e1792" class="display nowrap" data-quarto-disable-processing="true" style="table-layout:auto;width:auto;margin:auto;caption-side:bottom">
+<thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Latin file size [wdth] [bytes]</th>
+      <th>Category</th>
+      <th>Subsets</th>
+      <th>Style</th>
+      <th>Variables</th>
+    </tr>
+  </thead><tfoot><th>None</th><th>Latin file size [wdth] [bytes]</th><th>Category</th><th>Subsets</th><th>Style</th><th>Variables</th></tfoot><tbody><tr>
+<td style="vertical-align:middle; text-align:left">
+
+Loading ITables v2.2.4 from the internet...
+(need <a href=https://mwouts.github.io/itables/troubleshooting.html>help</a>?)</td>
+</tr></tbody>
+</table>
+<link href="https://www.unpkg.com/dt_for_itables@2.0.13/dt_bundle.css" rel="stylesheet">
+<script type="module">
+    import {DataTable, jQuery as $} from 'https://www.unpkg.com/dt_for_itables@2.0.13/dt_bundle.js';
+
+    document.querySelectorAll("#itables_2ee72155_2e90_44d4_b3f5_7d02a98e1792:not(.dataTable)").forEach(table => {
+        if (!(table instanceof HTMLTableElement))
+            return;
+
+        // Define the table data
+        const data = [["<a href=\"https://fontsource.org/fonts/advent-pro\">Advent Pro</a>", 50276, "sans", "[cyrillic, cyrillic-ext, greek, latin, latin-ext]", "[italic, normal]", "(ital, wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anybody\">Anybody</a>", 56712, "display", "[latin, latin-ext, vietnamese]", "[italic, normal]", "(ital, wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/asap\">Asap</a>", 89624, "sans", "[latin, latin-ext, vietnamese]", "[italic, normal]", "(ital, wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/archivo\">Archivo</a>", 89912, "sans", "[latin, latin-ext, vietnamese]", "[italic, normal]", "(ital, wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-malayalam\">Anek Malayalam</a>", 95292, "sans", "[latin, latin-ext, malayalam]", "[normal]", "(wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-kannada\">Anek Kannada</a>", 95344, "sans", "[kannada, latin, latin-ext]", "[normal]", "(wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-gurmukhi\">Anek Gurmukhi</a>", 97028, "sans", "[gurmukhi, latin, latin-ext]", "[normal]", "(wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-gujarati\">Anek Gujarati</a>", 97240, "sans", "[gujarati, latin, latin-ext]", "[normal]", "(wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-tamil\">Anek Tamil</a>", 99328, "sans", "[latin, latin-ext, tamil]", "[normal]", "(wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-odia\">Anek Odia</a>", 99588, "sans", "[latin, latin-ext, oriya]", "[normal]", "(wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-bangla\">Anek Bangla</a>", 99696, "sans", "[bengali, latin, latin-ext]", "[normal]", "(wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-telugu\">Anek Telugu</a>", 100264, "sans", "[latin, latin-ext, telugu]", "[normal]", "(wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-latin\">Anek Latin</a>", 103852, "sans", "[latin, latin-ext, vietnamese]", "[normal]", "(wdth, wght)"], ["<a href=\"https://fontsource.org/fonts/anek-devanagari\">Anek Devanagari</a>", 114348, "sans", "[devanagari, latin, latin-ext]", "[normal]", "(wdth, wght)"]];
+
+        // Define the dt_args
+        let dt_args = {"layout": {"topStart": "search", "topEnd": "pageLength", "bottomStart": "paging", "bottomEnd": "info"}, "lengthMenu": [10, 25, 50, 100, 250, 500], "order": [], "warn_on_selected_rows_not_rendered": true, "initComplete": function () {
+    // Apply the search
+    this.api()
+        .columns()
+        .every(function () {
+            const that = this;
+
+            $('input', this.footer()).on('keyup change clear', function () {
+                if (that.search() !== this.value) {
+                    that.search(this.value).draw();
+                }
+            });
+        });
+}
+};
+        dt_args["data"] = data;
+
+        // Setup - add a text input to each header or footer cell
+$('#itables_2ee72155_2e90_44d4_b3f5_7d02a98e1792:not(.dataTable) tfoot th').each(function () {
+    var input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Search " + $(this).text();
+
+    $(this).html(input);
+});
+
+        new DataTable(table, dt_args);
+    });
+</script>
