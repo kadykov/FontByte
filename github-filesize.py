@@ -3,7 +3,6 @@ import json
 import os
 import asyncio
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Any
 
 import pandas as pd
@@ -25,14 +24,18 @@ class Font:
             self._metadata_cache = json.loads(contents.decoded_content)
         return self._metadata_cache
 
-    async def _generate_filename(self, subset=None, variable="wght", style="normal") -> str:
+    async def _generate_filename(
+        self, subset=None, variable="wght", style="normal"
+    ) -> str:
         metadata = await self.get_metadata()
         id = metadata["id"]
         if not subset:
             subset = metadata["defSubset"]
         return f"{id}-{subset}-{variable}-{style}.woff2"
 
-    async def get_filesize(self, subset=None, variable="wght", style="normal") -> int | None:
+    async def get_filesize(
+        self, subset=None, variable="wght", style="normal"
+    ) -> int | None:
         filename = await self._generate_filename(
             subset=subset, variable=variable, style=style
         )
@@ -96,13 +99,13 @@ async def process_font(font_name: str, axis: str) -> tuple[str, dict] | None:
     subsets = await font.get_subsets()
     variables = await font.get_variables()
     filesize = await font.get_filesize(variable=axis)
-    
+
     if ("latin" in subsets) and (axis in variables and filesize):
         family = await font.get_family()
         url = await font.get_url()
         linked_family = f'<a href="{url}">{family}</a>'
         print(family)
-        
+
         return linked_family, {
             "size": filesize,
             "category": await font.get_category(),
@@ -112,16 +115,17 @@ async def process_font(font_name: str, axis: str) -> tuple[str, dict] | None:
         }
     return None
 
+
 async def create_font_table(font_names: list[str], axis: str, output_file: str) -> None:
     tasks = [process_font(font_name, axis) for font_name in font_names]
     results = await asyncio.gather(*tasks)
-    
+
     sizes = {}
     categories = {}
     subsets = {}
     styles = {}
     variables = {}
-    
+
     for result in results:
         if result:
             linked_family, data = result
@@ -161,11 +165,13 @@ async def create_font_table(font_names: list[str], axis: str, output_file: str) 
 # Create tables for different axes
 axes = ["wght", "opsz", "ital", "wdth"]
 
+
 # Generate tables for each axis
 async def main():
     for axis in axes:
         print(f"\nGenerating table for {axis} axis...")
         await create_font_table(font_names, axis, f"{axis}.html")
+
 
 # Run the async main function
 asyncio.run(main())
