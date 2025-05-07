@@ -1,8 +1,8 @@
 # %%
-import json
-import os
 import asyncio
 import base64
+import json
+import os
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -231,7 +231,7 @@ async def create_font_table(font_names: list[str], axis: str, output_file: str) 
 
 
 # Create tables for different axes
-axes = ["wght", "opsz", "ital", "wdth"]
+axes = ["wght", "opsz", "wdth"]
 
 
 # Generate tables for each axis
@@ -298,7 +298,6 @@ index_html = """<!DOCTYPE html>
 axis_descriptions = {
     "wght": "Weight axis - controls the thickness of the font strokes",
     "opsz": "Optical Size axis - optimizes the design for different sizes",
-    "ital": "Italic axis - controls the slant and cursive forms",
     "wdth": "Width axis - adjusts the horizontal proportions",
 }
 
