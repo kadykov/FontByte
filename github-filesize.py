@@ -8,11 +8,14 @@ from dataclasses import dataclass
 from typing import Any
 
 import aiohttp
+import nest_asyncio
 import pandas as pd
 from gidgethub import RateLimitExceeded
 from gidgethub.aiohttp import GitHubAPI
 from IPython.display import HTML
 from itables import to_html_datatable
+
+nest_asyncio.apply()
 
 # GitHub API limits
 MAX_CONCURRENT_REQUESTS = 50  # Keep well below the 100 limit
@@ -141,7 +144,7 @@ async def get_font_names() -> list[str]:
         response = await github_request(
             gh, "/repos/fontsource/font-files/contents/fonts/variable"
         )
-        return [item["name"] for item in response]  # No longer limiting to 50 fonts
+        return [item["name"] for item in response]  # [:10]  # Limit to 10 fonts
 
 
 # %%
@@ -224,6 +227,7 @@ async def create_font_table(font_names: list[str], axis: str, output_file: str) 
             },
             column_filters="footer",
             lengthMenu=[10, 25, 50, 100, 250, 500],
+            allow_html=True,
         )
 
         with open(output_file, "w") as table:
