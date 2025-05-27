@@ -1,5 +1,5 @@
 {
-  "name": "Quarto",
+  "name": "${localWorkspaceFolderBasename}-devcontainer",
   "build": {
     "dockerfile": "../Dockerfile"
   },
@@ -24,9 +24,15 @@
         "eamodio.gitlens",
         "ms-python.python",
         "ms-toolsai.jupyter",
-        "charliermarsh.ruff",
-        "ms-python.isort"
+        "charliermarsh.ruff"
       ]
     }
-  }
+  },
+  "mounts": [
+    {
+      "source": "${localWorkspaceFolderBasename}-vscode-global-storage",
+      "target": "/home/vscode/.vscode-server/data/User/globalStorage",
+      "type": "volume"
+    }
+  ]
 }
