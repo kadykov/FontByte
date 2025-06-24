@@ -7,6 +7,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from dotenv import load_dotenv
+
 import aiohttp
 import nest_asyncio
 import pandas as pd
@@ -15,6 +17,7 @@ from gidgethub.aiohttp import GitHubAPI
 from IPython.display import HTML
 from itables import to_html_datatable
 
+load_dotenv()
 nest_asyncio.apply()
 
 # GitHub API limits

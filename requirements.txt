@@ -5,3 +5,4 @@ nbclient
 gidgethub[aiohttp]
 pandas
 itables
+dotenv
