@@ -231,6 +231,7 @@ async def create_font_table(font_names: list[str], axis: str, output_file: str) 
             column_filters="footer",
             lengthMenu=[10, 25, 50, 100, 250, 500],
             allow_html=True,
+            showIndex=True,
         )
 
         with open(output_file, "w") as table:
