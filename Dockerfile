@@ -1,11 +1,11 @@
 FROM python:3.12-bookworm
 
-WORKDIR /data/
+WORKDIR /app
 
-COPY requirements.txt /data/
+COPY requirements.txt /app/
 
 RUN pip install -r requirements.txt --no-cache-dir
 
-RUN mkdir -p /home/vscode/.vscode-server/data/User/globalStorage
+COPY github-filesize.py /app/
 
-ENTRYPOINT [ "python", "./github-filesize.py" ]
+ENTRYPOINT [ "python", "/app/github-filesize.py" ]

@@ -1,20 +1,9 @@
 {
   "name": "${localWorkspaceFolderBasename}-devcontainer",
   "build": {
-    "dockerfile": "../Dockerfile"
+    "dockerfile": "../Dockerfile.dev"
   },
-  "features": {
-    "ghcr.io/devcontainers/features/common-utils:2": {
-      "installZsh": "true",
-      "username": "vscode",
-      "userUid": "1000",
-      "userGid": "1000",
-      "upgradePackages": "true"
-    },
-    "ghcr.io/lukewiwa/features/shellcheck:0": {},
-    "ghcr.io/kadykov/devcontainer-features/pre-commit:1": {}
-  },
-  "postCreateCommand": "pre-commit install",
+  "postCreateCommand": "export PATH=\"$HOME/.local/bin:$PATH\" && python -m pip install --user -r requirements.txt pre-commit && pre-commit install",
   "remoteUser": "vscode",
   "customizations": {
     "vscode": {

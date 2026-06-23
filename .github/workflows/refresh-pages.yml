@@ -1,0 +1,65 @@
+---
+name: Refresh Pages from Published Image
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/kadykov/fontbyte:latest
+  OUTPUT_DIR: public
+  OUTPUT_ARTIFACTS_NAME: website
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render_and_publish:
+    name: Render using latest published image and publish pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull latest published image
+        run: docker pull ${{ env.IMAGE }}
+
+      - name: Render with full data
+        run: >
+          docker container run --rm
+          -v "${PWD}:/work"
+          -w "/work"
+          --user "$(id -u):$(id -g)"
+          -e "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}"
+          -e "MAX_CONCURRENT_REQUESTS=5"
+          -e "REQUESTS_PER_MINUTE=60"
+          ${{ env.IMAGE }}
+
+      - run: mkdir -p ./${{ env.OUTPUT_DIR }} && cp ./*.html ./${{ env.OUTPUT_DIR }}
+
+      - name: Upload rendered artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.OUTPUT_ARTIFACTS_NAME }}
+          path: ./${{ env.OUTPUT_DIR }}
+          if-no-files-found: error
+
+      - name: Deploy site to GitHub pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./${{ env.OUTPUT_DIR }}

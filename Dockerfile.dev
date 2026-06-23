@@ -1,0 +1,10 @@
+FROM mcr.microsoft.com/devcontainers/python:3-3.12-trixie
+
+WORKDIR /workspaces/FontByte
+
+RUN rm -f /etc/apt/sources.list.d/yarn.list /etc/apt/sources.list.d/yarn.list.save \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends shellcheck \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /home/vscode/.vscode-server/data/User/globalStorage /home/vscode/.vscode-server/bin /workspaces \
+    && chown -R vscode:vscode /home/vscode /workspaces
