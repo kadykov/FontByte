@@ -2,10 +2,9 @@ FROM python:3.12-bookworm
 
 WORKDIR /app
 
-COPY requirements.txt /app/
+COPY pyproject.toml README.md /app/
+COPY github_filesize.py /app/
 
-RUN pip install -r requirements.txt --no-cache-dir
+RUN pip install --no-cache-dir .
 
-COPY github-filesize.py /app/
-
-ENTRYPOINT [ "python", "/app/github-filesize.py" ]
+ENTRYPOINT [ "python", "-m", "github_filesize" ]

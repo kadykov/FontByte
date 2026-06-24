@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fontbyte"
+version = "0.1.0"
+description = "Generate variable font size tables for Fontsource fonts"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "aiohttp==3.12.2",
+  "gidgethub[aiohttp]==5.3.0",
+  "ipython==8.30.0",
+  "itables==2.4.0",
+  "nest-asyncio==1.6.0",
+  "packaging>=24.0",
+  "pandas==2.2.3",
+  "python-dotenv==1.2.2",
+]
+
+[project.optional-dependencies]
+dev = ["pre-commit>=3.7.0"]
+
+[project.scripts]
+fontbyte = "github_filesize:cli"
+
+[tool.setuptools]
+py-modules = ["github_filesize"]

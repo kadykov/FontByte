@@ -29,8 +29,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -r requirements.txt
-      - run: python -m pip install pre-commit
+      - run: python -m pip install -e '.[dev]'
       - run: pre-commit run --all-files
 
   unit_tests:
@@ -43,7 +42,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -r requirements.txt
+      - run: python -m pip install -e '.[dev]'
       - run: python -m unittest -q tests/test_github_filesize.py
 
   build_candidate:
@@ -111,6 +110,7 @@ jobs:
           -w "/work"
           --user "$(id -u):$(id -g)"
           -e "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}"
+          -e "OUTPUT_DIR=/work"
           -e "MAX_CONCURRENT_REQUESTS=5"
           -e "REQUESTS_PER_MINUTE=60"
           ${{ env.REGISTRY_IMAGE }}@${{ needs.build_candidate.outputs.image_digest }}
