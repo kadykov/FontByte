@@ -134,6 +134,7 @@ class GithubFilesizeHelpersTest(unittest.TestCase):
             github_filesize.MAX_CONCURRENT_REQUESTS = original_max_concurrent
             github_filesize.REQUESTS_PER_MINUTE = original_requests_per_minute
             github_filesize._runtime_initialized = original_runtime_initialized
+
     def test_rejects_non_integer_environment_variables(self):
         with patch.dict(os.environ, {"MAX_CONCURRENT_REQUESTS": "abc"}, clear=False):
             with self.assertRaises(ValueError):
