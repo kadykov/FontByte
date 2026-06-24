@@ -6,6 +6,7 @@ import math
 import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import aiohttp
@@ -90,6 +91,13 @@ def limit_font_names(font_names: list[str], max_fonts: int | None = None) -> lis
     if max_fonts is None or max_fonts <= 0:
         return font_names
     return font_names[:max_fonts]
+
+
+def resolve_output_path(filename: str) -> Path:
+    """Resolve an output path relative to OUTPUT_DIR when provided."""
+    output_dir = os.getenv("OUTPUT_DIR", "").strip()
+    base_dir = Path(output_dir).expanduser() if output_dir else Path.cwd()
+    return base_dir / filename
 
 
 def get_max_fonts() -> int | None:
@@ -329,7 +337,9 @@ async def create_font_table(font_names: list[str], axis: str, output_file: str) 
             buttons=["columnsToggle"],
         )
 
-        with open(output_file, "w", encoding="utf-8") as table:
+        output_path = resolve_output_path(output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w", encoding="utf-8") as table:
             table.write(str(HTML(html).data or ""))
 
 
@@ -421,7 +431,9 @@ def write_index_page() -> None:
 </body>
 </html>"""
 
-    with open("index.html", "w", encoding="utf-8") as f:
+    output_path = resolve_output_path("index.html")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as f:
         f.write(index_html)
 
 

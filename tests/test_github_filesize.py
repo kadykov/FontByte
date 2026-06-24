@@ -3,6 +3,7 @@ import importlib.util
 import os
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, patch
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "github_filesize.py"
@@ -84,6 +85,13 @@ class GithubFilesizeHelpersTest(unittest.TestCase):
     def test_reads_limit_from_environment(self):
         with patch.dict(os.environ, {"MAX_FONTS": "3"}, clear=False):
             self.assertEqual(github_filesize.get_max_fonts(), 3)
+
+    def test_resolve_output_path_uses_output_dir_environment(self):
+        with TemporaryDirectory() as temp_dir:
+            with patch.dict(os.environ, {"OUTPUT_DIR": temp_dir}, clear=False):
+                output_path = github_filesize.resolve_output_path("index.html")
+
+            self.assertEqual(output_path, Path(temp_dir) / "index.html")
 
     def test_rejects_negative_environment_limit(self):
         with patch.dict(os.environ, {"MAX_FONTS": "-1"}, clear=False):

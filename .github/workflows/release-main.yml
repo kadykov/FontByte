@@ -110,6 +110,7 @@ jobs:
           -w "/work"
           --user "$(id -u):$(id -g)"
           -e "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}"
+          -e "OUTPUT_DIR=/work"
           -e "MAX_CONCURRENT_REQUESTS=5"
           -e "REQUESTS_PER_MINUTE=60"
           ${{ env.REGISTRY_IMAGE }}@${{ needs.build_candidate.outputs.image_digest }}
