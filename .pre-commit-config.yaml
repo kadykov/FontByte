@@ -1,7 +1,7 @@
 ---
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: check-shebang-scripts-are-executable
       - id: trailing-whitespace
@@ -24,29 +24,29 @@ repos:
     # requires `shellcheck` to work properly
     # https://github.com/rhysd/actionlint/issues/477
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.4
+    rev: v1.7.12
     hooks:
       - id: actionlint
 
   - repo: https://github.com/google/yamlfmt
-    rev: v0.14.0
+    rev: v0.21.0
     hooks:
       - id: yamlfmt
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.17.0
+    rev: v3.21.2
     hooks:
       - id: pyupgrade
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.2
+    rev: v0.15.19
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+    rev: v2.1.0
     hooks:
       - id: mypy
         additional_dependencies: [requests]
