@@ -116,19 +116,26 @@ async def rate_limit_wait():
     if request_lock is None:
         raise RuntimeError("request_lock is not initialized")
 
-    now = time.time()
-    async with request_lock:
-        # Remove requests older than 1 minute
-        while request_times and request_times[0] < now - 60:
-            request_times.pop(0)
-        # If we're at the limit, wait until we have capacity
-        if len(request_times) >= REQUESTS_PER_MINUTE:
+    while True:
+        now = time.time()
+        async with request_lock:
+            # Remove requests older than 1 minute.
+            while request_times and request_times[0] < now - 60:
+                request_times.pop(0)
+
+            if len(request_times) < REQUESTS_PER_MINUTE:
+                request_times.append(now)
+                return
+
             wait_time = request_times[0] - (now - 60)
-            if wait_time > 0:
-                print(f"Rate limit reached, waiting {wait_time:.1f} seconds...")
-                await asyncio.sleep(wait_time)
-                now = time.time()
-        request_times.append(now)
+
+        if wait_time > 0:
+            print(f"Rate limit reached, waiting {wait_time:.1f} seconds...")
+            await asyncio.sleep(wait_time)
+            continue
+
+        # If the oldest timestamp has already expired, try again immediately.
+        continue
 
 
 def get_reset_delay(error: RateLimitExceeded) -> int:

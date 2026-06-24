@@ -1,6 +1,7 @@
 import asyncio
 import importlib.util
 import os
+import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -154,6 +155,31 @@ class GithubFilesizeHelpersTest(unittest.TestCase):
         ):
             with self.assertRaises(RuntimeError):
                 asyncio.run(github_filesize.rate_limit_wait())
+
+    def test_rate_limit_wait_releases_lock_during_sleep(self):
+        acquired = asyncio.Event()
+
+        async def fake_sleep(delay):
+            async def try_acquire():
+                async with github_filesize.request_lock:
+                    acquired.set()
+
+            await asyncio.wait_for(try_acquire(), timeout=0.01)
+            raise RuntimeError("stop waiting")
+
+        with (
+            patch.object(github_filesize, "initialize_runtime", return_value=None),
+            patch.object(github_filesize, "request_semaphore", object()),
+            patch.object(github_filesize, "request_lock", asyncio.Lock()),
+            patch.object(github_filesize, "request_times", [time.time() + 120]),
+            patch.object(github_filesize, "REQUESTS_PER_MINUTE", 1),
+            patch.object(github_filesize.asyncio, "sleep", new=fake_sleep),
+            patch("builtins.print"),
+        ):
+            with self.assertRaises(RuntimeError):
+                asyncio.run(github_filesize.rate_limit_wait())
+
+        self.assertTrue(acquired.is_set())
 
     def test_get_reset_delay_uses_safe_default_for_invalid_values(self):
         class DummyRateLimitExceeded(Exception):
