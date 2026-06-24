@@ -107,6 +107,10 @@ class GithubFilesizeHelpersTest(unittest.TestCase):
 
     def test_initialize_runtime_creates_request_lock(self):
         original_request_lock = github_filesize.request_lock
+        original_request_semaphore = github_filesize.request_semaphore
+        original_request_times = github_filesize.request_times
+        original_max_concurrent = github_filesize.MAX_CONCURRENT_REQUESTS
+        original_requests_per_minute = github_filesize.REQUESTS_PER_MINUTE
         original_runtime_initialized = github_filesize._runtime_initialized
         try:
             with (
@@ -125,8 +129,11 @@ class GithubFilesizeHelpersTest(unittest.TestCase):
             mock_apply.assert_called_once_with()
         finally:
             github_filesize.request_lock = original_request_lock
+            github_filesize.request_semaphore = original_request_semaphore
+            github_filesize.request_times = original_request_times
+            github_filesize.MAX_CONCURRENT_REQUESTS = original_max_concurrent
+            github_filesize.REQUESTS_PER_MINUTE = original_requests_per_minute
             github_filesize._runtime_initialized = original_runtime_initialized
-
     def test_rejects_non_integer_environment_variables(self):
         with patch.dict(os.environ, {"MAX_CONCURRENT_REQUESTS": "abc"}, clear=False):
             with self.assertRaises(ValueError):
