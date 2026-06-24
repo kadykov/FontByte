@@ -1,8 +1,1 @@
-ipykernel
-pyyaml
-nbformat
-nbclient
-gidgethub[aiohttp]
-pandas
-itables
-dotenv
+-e .[dev]

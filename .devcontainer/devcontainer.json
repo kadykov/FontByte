@@ -3,8 +3,12 @@
   "build": {
     "dockerfile": "../Dockerfile.dev"
   },
-  "postCreateCommand": "export PATH=\"$HOME/.local/bin:$PATH\" && python -m pip install --user -r requirements.txt pre-commit && pre-commit install",
+  "postCreateCommand": "python3 -m venv .venv && . .venv/bin/activate && python -m pip install --upgrade pip && python -m pip install -e '.[dev]' && pre-commit install",
   "remoteUser": "vscode",
+  "remoteEnv": {
+    "VIRTUAL_ENV": "${containerWorkspaceFolder}/.venv",
+    "PATH": "${containerWorkspaceFolder}/.venv/bin:${containerEnv:PATH}"
+  },
   "customizations": {
     "vscode": {
       "extensions": [

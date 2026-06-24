@@ -425,7 +425,11 @@ def write_index_page() -> None:
         f.write(index_html)
 
 
-if __name__ == "__main__":
+def cli() -> None:
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    cli()
 
 # %%

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / "github-filesize.py"
+MODULE_PATH = Path(__file__).resolve().parents[1] / "github_filesize.py"
 spec = importlib.util.spec_from_file_location("github_filesize", MODULE_PATH)
 if spec is None:
     raise RuntimeError(f"Unable to load module from {MODULE_PATH}")
