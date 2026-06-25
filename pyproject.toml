@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "aiohttp==3.12.2",
-  "gidgethub[aiohttp]==5.3.0",
+  "gidgethub[aiohttp]==5.4.0",
   "ipython==8.30.0",
   "itables==2.4.0",
   "nest-asyncio==1.6.0",
