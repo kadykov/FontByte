@@ -9,8 +9,6 @@ on:
 env:
   REGISTRY_IMAGE: ghcr.io/kadykov/fontbyte
   CANDIDATE_TAG: sha-${{ github.sha }}
-  OUTPUT_DIR: public
-  OUTPUT_ARTIFACTS_NAME: website
 
 permissions:
   contents: read
@@ -78,8 +76,8 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY_IMAGE }}:latest
           cache-to: type=inline
 
-  validate_and_render:
-    name: Validate candidate with full render
+  verify_candidate:
+    name: Verify candidate image
     needs: build_candidate
     runs-on: ubuntu-latest
     permissions:
@@ -103,30 +101,22 @@ jobs:
           docker pull
           ${{ env.REGISTRY_IMAGE }}@${{ needs.build_candidate.outputs.image_digest }}
 
-      - name: Render with full data
+      - name: Render with limited fonts
         run: >
           docker container run --rm
-          -v "${PWD}:/work"
-          -w "/work"
+          -v "${PWD}:/data"
+          -w "/data"
           --user "$(id -u):$(id -g)"
           -e "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}"
-          -e "OUTPUT_DIR=/work"
+          -e "OUTPUT_DIR=/data"
+          -e "MAX_FONTS=10"
           -e "MAX_CONCURRENT_REQUESTS=5"
           -e "REQUESTS_PER_MINUTE=60"
           ${{ env.REGISTRY_IMAGE }}@${{ needs.build_candidate.outputs.image_digest }}
 
-      - run: mkdir -p ./${{ env.OUTPUT_DIR }} && cp ./*.html ./${{ env.OUTPUT_DIR }}
-
-      - name: Upload rendered artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.OUTPUT_ARTIFACTS_NAME }}
-          path: ./${{ env.OUTPUT_DIR }}
-          if-no-files-found: error
-
   promote_image:
     name: Promote candidate image
-    needs: [validate_and_render, build_candidate]
+    needs: [build_candidate, verify_candidate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -148,24 +138,3 @@ jobs:
           --tag ${{ env.REGISTRY_IMAGE }}:latest
           --tag ${{ env.REGISTRY_IMAGE }}:stable
           ${{ env.REGISTRY_IMAGE }}@${{ needs.build_candidate.outputs.image_digest }}
-
-  publish:
-    name: Publish to GitHub pages
-    needs: [validate_and_render, promote_image]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ env.OUTPUT_ARTIFACTS_NAME }}
-          path: ${{ env.OUTPUT_DIR }}/
-
-      - name: Deploy site to GitHub pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./${{ env.OUTPUT_DIR }}
