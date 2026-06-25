@@ -15,7 +15,7 @@ dependencies = [
   "itables==2.4.0",
   "nest-asyncio==1.6.0",
   "packaging>=24.0",
-  "pandas==2.2.3",
+  "pandas==3.0.3",
   "python-dotenv==1.2.2",
 ]
 
