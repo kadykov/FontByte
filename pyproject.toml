@@ -16,7 +16,7 @@ dependencies = [
   "nest-asyncio==1.6.0",
   "packaging>=24.0",
   "pandas==3.0.5",
-  "python-dotenv==1.2.2",
+  "python-dotenv==1.2.3",
 ]
 
 [project.optional-dependencies]
